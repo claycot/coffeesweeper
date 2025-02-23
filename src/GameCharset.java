@@ -1,13 +1,13 @@
 package src;
 
-enum Charset {
-    MINE('*'),
+enum GameCharset {
+    MINE('⛯'),
     FLAG('⚑'),
     BLANK(' ');
 
-    private char displayChar;
+    private final char displayChar;
 
-    Charset(char displayChar) {
+    GameCharset(char displayChar) {
         this.displayChar = displayChar;
     }
 

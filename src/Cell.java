@@ -18,6 +18,7 @@ public class Cell {
         this.neighborMines = neighborMines;
     }
 
+    // reveal the cell and return the value within (-1 if a mine)
     public int Reveal() {
         this.revealed = true;
         this.flagged = false;
@@ -30,25 +31,27 @@ public class Cell {
         }
     }
 
+    // flag a cell (if it's not already revealed)
     public void Flag() {
         if (!this.revealed) {
             this.flagged = !this.flagged;
         }
     }
 
+    // return the GameCharset value for the cell
     public char getDisplayChar() {
         char displayChar;
         if (this.getFlagged()) {
-            displayChar = Charset.FLAG.getDisplayChar();
+            displayChar = GameCharset.FLAG.getDisplayChar();
         }
         else if (!this.getRevealed()) {
-            displayChar = Charset.BLANK.getDisplayChar();
+            displayChar = GameCharset.BLANK.getDisplayChar();
         }
         else if (this.getMine()) {
-            displayChar = Charset.MINE.getDisplayChar();
+            displayChar = GameCharset.MINE.getDisplayChar();
         }
         else if (this.getNeighborMines() == 0) {
-            displayChar = Charset.BLANK.getDisplayChar();
+            displayChar = GameCharset.BLANK.getDisplayChar();
         }
         else {
             displayChar = (char) ('0' + this.getNeighborMines());
