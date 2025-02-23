@@ -12,8 +12,16 @@ public class Board {
     int height;
     int width;
     int nMines;
+
     Cell[][] cells;
     JButton[][] buttons;
+    int cellsUncovered;
+
+    public enum State {
+        IN_PROGRESS, WON, LOST
+    }
+
+    public State state = State.IN_PROGRESS;
 
     // relative offset for neighboring cells
     private static final int[][] dirs = {
@@ -31,6 +39,7 @@ public class Board {
         this.height = height;
         this.width = width;
         this.nMines = nMines;
+        this.cellsUncovered = 0;
 
         // generate a boolean array of mines
         boolean[][] mineMap = generateMines(firstRow, firstCol);
@@ -41,7 +50,7 @@ public class Board {
             for (int c = 0; c < this.width; c++) {
                 this.cells[r][c] = new Cell(
                         mineMap[r][c],
-                        countNeighborMines(mineMap, r, c));
+                        this.countNeighborMines(mineMap, r, c));
             }
         }
 
@@ -55,11 +64,11 @@ public class Board {
             StringBuilder row = new StringBuilder();
             for (int c = 0; c < this.width; c++) {
                 if (!this.getCell(r, c).getRevealed()) {
-                    row.append(Charset.BLANK.getDisplayChar());
+                    row.append(GameCharset.BLANK.getDisplayChar());
                 } else if (this.getCell(r, c).getFlagged()) {
-                    row.append(Charset.FLAG.getDisplayChar());
+                    row.append(GameCharset.FLAG.getDisplayChar());
                 } else if (this.getCell(r, c).getMine()) {
-                    row.append(Charset.MINE.getDisplayChar());
+                    row.append(GameCharset.MINE.getDisplayChar());
                 } else {
                     row.append(this.getCell(r, c).getNeighborMines());
                 }
@@ -69,33 +78,28 @@ public class Board {
         }
     }
 
-    // check if the player has won, lost, or is in progress
-    public int getState() {
-        int tilesRemaining = 0;
-
-        for (int r = 0; r < this.height; r++) {
-            for (int c = 0; c < this.width; c++) {
-                if (!this.getCell(r, c).getRevealed()) {
-                    tilesRemaining++;
-                    // if the cell is revealed and there is a mine, the game is lost
-                } else if (this.getCell(r, c).getMine()) {
-                    // 2 - lost
-                    return 2;
-                }
-            }
+    // after uncovering a cell, check if the player has won, lost, or is in progress
+    public void updateState(int r, int c) {
+        // if the user uncoverd a mine, end the game
+        if (this.getCell(r, c).getMine()) {
+            this.state = State.LOST;
         }
-
-        // if there are more tiles to reveal than mines, game is still in progress
-        if (tilesRemaining > nMines) {
-            // 0 - in progress
-            return 0;
+        // if there are more cells to reveal than mines, game is still in progress
+        else if ((this.height * this.width - this.cellsUncovered) > this.nMines) {
+            this.state = State.IN_PROGRESS;
         }
-
         // if neither of those conditions is true, the game is won!
-        // 1 - won
-        return 1;
+        else {
+            this.state = State.WON;
+        }
     }
 
+    // return game state: WON, LOST, or IN_PROGRESS
+    public State getState() {
+        return this.state;
+    }
+
+    // generate a boolean map of mines
     private boolean[][] generateMines(int rowSafe, int colSafe) {
         boolean[][] mines = new boolean[this.height][this.width];
 
@@ -104,7 +108,7 @@ public class Board {
             int r = (int) (Math.random() * height);
             int c = (int) (Math.random() * width);
 
-            // if the mine already exists, try again
+            // if the mine already exists, or is in the first safe space, try again
             if (mines[r][c] == true || (r == rowSafe && c == colSafe)) {
                 m--;
             } else {
@@ -115,6 +119,7 @@ public class Board {
         return mines;
     }
 
+    // count how many mines border the cell
     private int countNeighborMines(boolean[][] mineMap, int row, int col) {
         int count = 0;
 
@@ -136,6 +141,7 @@ public class Board {
         return count;
     }
 
+    // fetch a ref to a cell with given row, col coordinates
     public Cell getCell(int r, int c) {
         if (r < 0 || r >= this.height || c < 0 || c >= this.width) {
             throw new IllegalArgumentException("Attempted to fetch a cell that doesn't exist.");
@@ -144,6 +150,7 @@ public class Board {
         return this.cells[r][c];
     }
 
+    // assign a button to a row and col coordinate
     public void setButton(JButton button, int r, int c) {
         if (r < 0 || r >= this.height || c < 0 || c >= this.width) {
             throw new IllegalArgumentException("Attempted to set a button that doesn't exist.");
@@ -152,44 +159,47 @@ public class Board {
         this.buttons[r][c] = button;
     }
 
-    public JButton getButton(int r, int c) {
+    // update the button text to reveal what is in the underlying cell, and disable
+    // it
+    public void revealAndDisableButton(int r, int c) {
         if (r < 0 || r >= this.height || c < 0 || c >= this.width) {
-            throw new IllegalArgumentException("Attempted to fetch a button that doesn't exist.");
+            throw new IllegalArgumentException("Attempted to reveal a button that doesn't exist.");
         }
 
-        return this.buttons[r][c];
+        JButton button = this.buttons[r][c];
+
+        button.setText(Character.toString(this.getCell(r, c).getDisplayChar()));
+        button.setEnabled(false);
     }
 
-    public void leftClick(int r, int c) {
-        Cell cell = getCell(r, c);
-        if (!cell.getRevealed()) {
-            // reveal the cell
-            int cellVal = cell.Reveal();
-
-            // if the game ends after that action, don't bother doing anything else
-            int state = getState();
-            if (state != 0) {
-                return;
-            }
-
-            // if the value was 0, queue and uncover all adjacent cells
-            if (cellVal == 0) {
-                recursiveUncover(r, c);
-            }
+    // update the button text to reveal what is in the underlying cell
+    public void revealButton(int r, int c) {
+        if (r < 0 || r >= this.height || c < 0 || c >= this.width) {
+            throw new IllegalArgumentException("Attempted to flag a button that doesn't exist.");
         }
 
-        this.getButton(r, c).setText(Character.toString(this.getCell(r, c).getDisplayChar()));
-        this.getButton(r, c).setEnabled(false);
+        JButton button = this.buttons[r][c];
+
+        button.setText(Character.toString(this.getCell(r, c).getDisplayChar()));
+    }
+
+    // left clicking at any spot on the board will reveal the cell
+    public void leftClick(int r, int c) {
+        Cell cell = this.getCell(r, c);
+        if (!cell.getRevealed()) {
+            this.floodReveal(r, c);
+        }
     }
 
     public void rightClick(int r, int c) {
-        Cell cell = getCell(r, c);
+        Cell cell = this.getCell(r, c);
         // if the cell isn't revealed, flag it
         if (!cell.getRevealed()) {
             cell.Flag();
+            this.revealButton(r, c);
         }
-        // if the cell is revealed, and it's touching as many flags as its val, reveal
-        // all touching cells
+        // if the cell is revealed, and it's touching as many flags as its val,
+        // reveal all touching cells
         else {
             // count flag neighbors
             int neighborFlags = 0;
@@ -220,58 +230,64 @@ public class Board {
                 }
             }
 
+            // if the cell is surrounded by as many flagged cells as mines, reveal them
             if (Character.getNumericValue(cell.getDisplayChar()) == neighborFlags) {
                 while (!queueUncover.isEmpty()) {
                     int rUncover = queueUncover.remove();
                     int cUncover = queueUncover.remove();
 
-                    int revealed = this.getCell(rUncover, cUncover).Reveal();
-
-                    if (revealed == 0) {
-                        recursiveUncover(rUncover, cUncover);
-                    }
-                    this.getButton(rUncover, cUncover)
-                            .setText(Character.toString(this.getCell(rUncover, cUncover).getDisplayChar()));
-                    this.getButton(rUncover, cUncover).setEnabled(false);
+                    this.floodReveal(rUncover, cUncover);
                 }
             }
         }
-        this.getButton(r, c).setText(Character.toString(this.getCell(r, c).getDisplayChar()));
     }
 
-    private void recursiveUncover(int r, int c) {
+    private void floodReveal(int r, int c) {
         Queue<Integer> queue = new LinkedList<>();
         Map<String, Boolean> checked = new HashMap<>();
         queue.add(r);
         queue.add(c);
 
         while (!queue.isEmpty()) {
-
             // get the head of the queue
             int rHead = queue.remove();
             int cHead = queue.remove();
+            Cell cell = this.getCell(rHead, cHead);
+
+            // stop if the cell is flagged or revealed
+            if (cell.getFlagged() || cell.getRevealed()) {
+                continue;
+            }
+
+            // hash the cell
             if (checked.containsKey(String.format("%d,%d", rHead, cHead))) {
                 continue;
             }
             checked.put(String.format("%d,%d", rHead, cHead), true);
 
-            // look in 8 neighboring cells for empty cells
-            for (int[] dir : Board.dirs) {
-                int row = rHead + dir[0];
-                int col = cHead + dir[1];
+            // reveal the cell
+            int revealed = cell.Reveal();
+            this.cellsUncovered++;
+            this.revealAndDisableButton(rHead, cHead);
+            this.updateState(rHead, cHead);
 
-                // bounds check
-                if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
-                    continue;
-                }
+            // if cell was empty, reveal its neighbors
+            if (revealed == 0) {
+                for (int[] dir : Board.dirs) {
+                    int row = rHead + dir[0];
+                    int col = cHead + dir[1];
 
-                // reveal adjacent cells
-                int revealed = this.getCell(row, col).Reveal();
-                this.getButton(row, col).setText(Character.toString(this.getCell(row, col).getDisplayChar()));
-                this.getButton(row, col).setEnabled(false);
+                    // bounds check
+                    if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+                        continue;
+                    }
 
-                // enqueue revealed cell if it was also blank
-                if (revealed == 0) {
+                    // previously revealed check
+                    if (this.getCell(row, col).getRevealed()) {
+                        continue;
+                    }
+
+                    // enqueue revealed cell
                     queue.add(row);
                     queue.add(col);
                 }
