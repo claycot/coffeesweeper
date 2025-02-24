@@ -146,7 +146,7 @@ public class Board {
 
     // fetch a ref to a cell with given row, col coordinates
     public Cell getCell(int row, int col) {
-        if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+        if (!this.isValidCell(row, col)) {
             throw new IllegalArgumentException("Attempted to fetch a cell that doesn't exist.");
         }
 
@@ -155,7 +155,7 @@ public class Board {
 
     // assign a button to a row and col coordinate
     public void setButton(JButton button, int row, int col) {
-        if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+        if (!this.isValidCell(row, col)) {
             throw new IllegalArgumentException("Attempted to set a button that doesn't exist.");
         }
 
@@ -165,7 +165,7 @@ public class Board {
     // update the button text to reveal what is in the underlying cell, and disable
     // it
     public void revealAndDisableButton(int row, int col) {
-        if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+        if (!this.isValidCell(row, col)) {
             throw new IllegalArgumentException("Attempted to reveal a button that doesn't exist.");
         }
 
@@ -177,7 +177,7 @@ public class Board {
 
     // update the button text to reveal what is in the underlying cell
     public void revealButton(int row, int col) {
-        if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
+        if (!this.isValidCell(row, col)) {
             throw new IllegalArgumentException("Attempted to flag a button that doesn't exist.");
         }
 
