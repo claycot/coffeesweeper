@@ -40,16 +40,16 @@ public class Game {
         this.panel.setLayout(new GridLayout(height, width));
 
         // init dummy buttons because the game doesn't exist until one is clicked
-        for (int r = 0; r < height; r++) {
-            for (int c = 0; c < width; c++) {
+        for (int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
                 JButton button = new JButton(Character.toString(GameCharset.BLANK.getDisplayChar()));
-                final int row = r, col = c;
+                final int r = row, c = col;
                 button.addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
                         if (!Game.this.started) {
                             Game.this.started = true;
-                            startGame(row, col);
+                            Game.this.startGame(r, c);
                         }
                     }
                 });
@@ -69,11 +69,11 @@ public class Game {
         this.board = new Board(this.height, this.width, this.nMines, firstRow, firstCol);
         this.panel.removeAll();
 
-        for (int r = 0; r < this.height; r++) {
-            for (int c = 0; c < this.width; c++) {
+        for (int row = 0; row < this.height; row++) {
+            for (int col = 0; col < this.width; col++) {
                 JButton button = new JButton(Character.toString(GameCharset.BLANK.getDisplayChar()));
-                this.board.setButton(button, r, c);
-                button.addMouseListener(MouseListenerFactory.createMouseAdapter(this::useState, this.board, r, c));
+                this.board.setButton(button, row, col);
+                button.addMouseListener(MouseListenerFactory.createMouseAdapter(this::useState, this.board, row, col));
                 panel.add(button);
             }
         }
@@ -95,10 +95,10 @@ public class Game {
 
         // otherwise...
         // reveal the game board
-        for (int r = 0; r < this.height; r++) {
-            for (int c = 0; c < this.width; c++) {
-                this.board.getCell(r, c).Reveal();
-                this.board.revealButton(r, c);
+        for (int row = 0; row < this.height; row++) {
+            for (int col = 0; col < this.width; col++) {
+                this.board.getCell(row, col).Reveal();
+                this.board.revealButton(row, col);
             }
         }
 
