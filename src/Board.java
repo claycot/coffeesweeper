@@ -2,38 +2,32 @@ package src;
 
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 import javax.swing.JButton;
 
 // a board contains a 2D array of cells that may be uncovered or flagged
 public class Board {
-    int height;
-    int width;
-    int nMines;
+    private int height;
+    private int width;
+    private int nMines;
 
-    Cell[][] cells;
-    JButton[][] buttons;
-    int cellsUncovered;
+    private Cell[][] cells;
+    private JButton[][] buttons;
+    private int cellsUncovered;
 
-    public enum State {
-        IN_PROGRESS, WON, LOST
-    }
-
-    public State state = State.IN_PROGRESS;
+    private State state = State.IN_PROGRESS;
 
     // relative offset for neighboring cells
-    private static final int[][] dirs = {
-            { -1, -1 },
-            { -1, 0 },
-            { -1, 1 },
-            { 0, 1 },
-            { 1, 1 },
-            { 1, 0 },
-            { 1, -1 },
-            { 0, -1 },
-    };
+    // used in forEachNeighbor
+    private static final List<int[]> DIRECTIONS = List.of(
+            new int[] { -1, -1 }, new int[] { -1, 0 }, new int[] { -1, 1 },
+            new int[] { 0, -1 }, new int[] { 0, 1 },
+            new int[] { 1, -1 }, new int[] { 1, 0 }, new int[] { 1, 1 });
 
     Board(int height, int width, int nMines, int firstRow, int firstCol) {
         this.height = height;
@@ -76,6 +70,23 @@ public class Board {
             }
             System.out.println(row.toString());
         }
+    }
+
+    // perform the given action on all neighbors (8-directional adjacent)
+    private void forEachNeighbor(int row, int col, BiConsumer<Integer, Integer> action) {
+        for (int[] dir : DIRECTIONS) {
+            int r = row + dir[0];
+            int c = col + dir[1];
+
+            if (isValidCell(r, c)) {
+                action.accept(r, c);
+            }
+        }
+    }
+
+    // check bounds to validate cell
+    private boolean isValidCell(int row, int col) {
+        return row >= 0 && row < this.height && col >= 0 && col < this.width;
     }
 
     // after uncovering a cell, check if the player has won, lost, or is in progress
@@ -121,24 +132,16 @@ public class Board {
 
     // count how many mines border the cell
     private int countNeighborMines(boolean[][] mineMap, int row, int col) {
-        int count = 0;
+        AtomicInteger count = new AtomicInteger(0);
 
         // look in 8 neighboring cells for a mine
-        for (int[] dir : Board.dirs) {
-            int r = row + dir[0];
-            int c = col + dir[1];
-
-            // bounds check
-            if (r < 0 || r >= this.height || c < 0 || c >= this.width) {
-                continue;
-            }
-
+        this.forEachNeighbor(row, col, (r, c) -> {
             if (mineMap[r][c]) {
-                count++;
+                count.incrementAndGet();
             }
-        }
+        });
 
-        return count;
+        return count.get();
     }
 
     // fetch a ref to a cell with given row, col coordinates
@@ -183,7 +186,7 @@ public class Board {
         button.setText(Character.toString(this.getCell(r, c).getDisplayChar()));
     }
 
-    // left clicking at any spot on the board will reveal the cell
+    // left clicking on a cell will reveal it
     public void leftClick(int r, int c) {
         Cell cell = this.getCell(r, c);
         if (!cell.getRevealed()) {
@@ -191,6 +194,8 @@ public class Board {
         }
     }
 
+    // right clicking on a cell with toggle the flag, or flood reveal if enough
+    // neighboring cells are flagged
     public void rightClick(int r, int c) {
         Cell cell = this.getCell(r, c);
         // if the cell isn't revealed, flag it
@@ -202,25 +207,17 @@ public class Board {
         // reveal all touching cells
         else {
             // count flag neighbors
-            int neighborFlags = 0;
+            AtomicInteger neighborFlags = new AtomicInteger(0);
             Queue<Integer> queueUncover = new LinkedList<>();
 
             // look in 8 neighboring cells for empty cells
-            for (int[] dir : Board.dirs) {
-                int row = r + dir[0];
-                int col = c + dir[1];
-
-                // bounds check
-                if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
-                    continue;
-                }
-
+            this.forEachNeighbor(r, c, (row, col) -> {
                 // queue cell for uncovering if it's ready
                 Cell neighbor = getCell(row, col);
                 if (!neighbor.getRevealed()) {
                     // if the neighbor is flagged, count it
                     if (neighbor.getFlagged()) {
-                        neighborFlags++;
+                        neighborFlags.incrementAndGet();
                     }
                     // if the neighbor isn't flagged, queue it
                     else {
@@ -228,10 +225,10 @@ public class Board {
                         queueUncover.add(col);
                     }
                 }
-            }
+            });
 
             // if the cell is surrounded by as many flagged cells as mines, reveal them
-            if (Character.getNumericValue(cell.getDisplayChar()) == neighborFlags) {
+            if (Character.getNumericValue(cell.getDisplayChar()) == neighborFlags.get()) {
                 while (!queueUncover.isEmpty()) {
                     int rUncover = queueUncover.remove();
                     int cUncover = queueUncover.remove();
@@ -242,6 +239,8 @@ public class Board {
         }
     }
 
+    // reveal the cell at r, c
+    // if the revealed cell is a 0 (empty), reveal all neighbors
     private void floodReveal(int r, int c) {
         Queue<Integer> queue = new LinkedList<>();
         Map<String, Boolean> checked = new HashMap<>();
@@ -259,10 +258,11 @@ public class Board {
                 continue;
             }
 
-            // hash the cell
+            // stop if the cell has already been flood revealed
             if (checked.containsKey(String.format("%d,%d", rHead, cHead))) {
                 continue;
             }
+            // otherwise, hash and continue
             checked.put(String.format("%d,%d", rHead, cHead), true);
 
             // reveal the cell
@@ -273,24 +273,13 @@ public class Board {
 
             // if cell was empty, reveal its neighbors
             if (revealed == 0) {
-                for (int[] dir : Board.dirs) {
-                    int row = rHead + dir[0];
-                    int col = cHead + dir[1];
-
-                    // bounds check
-                    if (row < 0 || row >= this.height || col < 0 || col >= this.width) {
-                        continue;
+                this.forEachNeighbor(rHead, cHead, (row, col) -> {
+                    // enqueue revealed cell if it has not already been revealed
+                    if (!this.getCell(row, col).getRevealed()) {
+                        queue.add(row);
+                        queue.add(col);
                     }
-
-                    // previously revealed check
-                    if (this.getCell(row, col).getRevealed()) {
-                        continue;
-                    }
-
-                    // enqueue revealed cell
-                    queue.add(row);
-                    queue.add(col);
-                }
+                });
             }
         }
     }

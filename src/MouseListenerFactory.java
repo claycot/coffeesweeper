@@ -4,8 +4,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.function.Consumer;
 
-import src.Board.State;
-
 public class MouseListenerFactory {
     public static MouseAdapter createMouseAdapter(Consumer<State> callbackState, Board board, int row, int col) {
         return new MouseAdapter() {
